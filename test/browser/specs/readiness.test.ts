@@ -1,7 +1,9 @@
 import { expect, test } from 'vitest'
 import { instances, runInlineBrowserTests } from './utils'
 
-test('prepare waits until the tester can receive browser channel events', { timeout: 5000 }, async () => {
+// webdriverio needs more than 5s to start chromedriver on the macOS runners,
+// the timeout still catches a hanging `prepare`
+test('prepare waits until the tester can receive browser channel events', { timeout: 30_000 }, async () => {
   const { stderr, testTree } = await runInlineBrowserTests(
     {
       'basic.test.ts': `

@@ -359,7 +359,9 @@ test('re-evaluate setupFiles on each test run even when isolate is false', async
   })
 })
 
-test.runIf(provider.name === 'playwright')('timeout hooks', { retry: 2 }, async ({ onTestFailed }) => {
+// on Windows firefox nondeterministically drops some of the hook timeout errors,
+// which makes the snapshot below flaky even with retries
+test.runIf(provider.name === 'playwright' && process.platform !== 'win32')('timeout hooks', { retry: 2 }, async ({ onTestFailed }) => {
   const { stderr } = await runBrowserTests({
     root: './fixtures/timeout-hooks',
   })

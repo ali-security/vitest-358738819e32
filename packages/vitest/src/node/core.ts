@@ -286,12 +286,17 @@ export class Vitest {
 
       // since we set `server.hmr: false`, Vite does not auto restart itself
       server.watcher.on('change', async (file) => {
+        // a late watcher event can arrive after this instance was closed
+        // (seen on Windows); restarting a closed instance has nothing to report to
+        if (this.closingPromise) {
+          return
+        }
         file = normalize(file)
         const isConfig = file === server.config.configFile
           || this.projects.some(p => p.vite.config.configFile === file)
         if (isConfig) {
           await Promise.all(this._onRestartListeners.map(fn => fn('config')))
-          this.report('onServerRestart', 'config')
+          this.report('onServerRestart', 'config').catch(error => this.logger.error('error during server restart', error))
           await this.close()
           await serverRestart()
         }
@@ -1536,7 +1541,7 @@ export class Vitest {
    * @param force If true, the process will exit immediately after closing the projects.
    */
   public async exit(force = false): Promise<void> {
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       this.report('onProcessTimeout').then(() => {
         console.warn(`close timed out after ${this.config.teardownTimeout}ms`)
 
@@ -1563,6 +1568,10 @@ export class Vitest {
     }, this.config.teardownTimeout).unref()
 
     await this.close()
+    // close() finished in time: disarm the teardown watchdog so it cannot fire
+    // process.exit() later (e.g. in in-process runs that stub process.exit only
+    // for the duration of the call)
+    clearTimeout(timeout)
     if (force) {
       process.exit()
     }

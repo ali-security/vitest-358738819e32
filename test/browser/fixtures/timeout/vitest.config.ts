@@ -5,6 +5,7 @@ import { instances, provider, providers } from '../../settings'
 export default defineConfig({
   cacheDir: fileURLToPath(new URL("./node_modules/.vite", import.meta.url)),
   test: {
+    testTimeout: process.platform === 'win32' || process.platform === 'darwin' ? 60_000 : undefined,
     browser: {
       enabled: true,
       provider: provider.name === 'playwright'

@@ -7,12 +7,11 @@ describe.skipIf(
   // other tests affect the viewport if they run in a different order
   || server.config.browser.isolate === false,
 )('viewport window has been properly initialized', () => {
-  it.skipIf(!server.config.browser.headless)('viewport has proper size', () => {
+  it.skipIf(!server.config.browser.headless)('viewport has proper size', async () => {
     const { width, height } = server.config.browser.viewport
-    const { width: actualWidth, height: actualHeight } = window.document.documentElement.getBoundingClientRect()
 
-    expect(actualWidth).toBe(width)
-    expect(actualHeight).toBe(height)
+    await expect.poll(() => window.document.documentElement.getBoundingClientRect().width).toBe(width)
+    await expect.poll(() => window.document.documentElement.getBoundingClientRect().height).toBe(height)
   })
 
   it.skipIf(server.config.browser.headless)('window has been maximized', () => {

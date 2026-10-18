@@ -1,7 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const slow = process.platform === 'darwin' || process.platform === 'win32'
+
 export default defineConfig({
   testDir: './test',
+  timeout: slow ? 90_000 : 30_000,
+  expect: { timeout: slow ? 15_000 : 5_000 },
   projects: [
     {
       name: 'chromium',

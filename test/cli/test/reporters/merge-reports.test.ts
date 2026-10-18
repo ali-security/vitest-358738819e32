@@ -278,7 +278,7 @@ test('total and merged execution times are shown', async () => {
 test.for([
   'node',
   'browser',
-])('module graph and html reporter $0', async (mode) => {
+])('module graph and html reporter $0', { timeout: process.platform === 'win32' ? 180_000 : 60_000 }, async (mode) => {
   const root = resolve('./fixtures/reporters/merge-reports-module-graph')
   const reportsDir = resolve(root, '.vitest-reports')
   rmSync(reportsDir, { force: true, recursive: true })

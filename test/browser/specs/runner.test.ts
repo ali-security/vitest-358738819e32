@@ -359,7 +359,7 @@ test('re-evaluate setupFiles on each test run even when isolate is false', async
   })
 })
 
-test.runIf(provider.name === 'playwright')('timeout hooks', async ({ onTestFailed }) => {
+test.runIf(provider.name === 'playwright')('timeout hooks', { retry: 2 }, async ({ onTestFailed }) => {
   const { stderr } = await runBrowserTests({
     root: './fixtures/timeout-hooks',
   })

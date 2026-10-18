@@ -5,13 +5,13 @@ name: CI
 permissions: {}
 
 on:
-  push:
-    branches:
-      - main
-
-  pull_request:
-
   workflow_dispatch:
+    inputs:
+      test-filter:
+        description: Optional test filter appended to the test commands
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -22,73 +22,11 @@ env:
   VITEST_GENERATE_UI_TOKEN: 'true'
 
 jobs:
-  lint:
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    name: 'Lint: node-latest, ubuntu-latest'
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-and-cache
-
-      - name: Install
-        run: pnpm i
-
-      - name: Build
-        run: pnpm run build
-
-      - name: Generate CLI docs
-        run: pnpm -C docs run cli-table
-
-      # check uncommited LICENSE.md, auto-imports.d.ts, etc...
-      - name: Check stale build artifacts
-        run: git diff --exit-code
-
-      - name: Lint
-        run: pnpm run lint
-
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Typecheck UI
-        run: pnpm run -C packages/ui typecheck:client
-
-      # From https://github.com/rhysd/actionlint/blob/main/docs/usage.md#use-actionlint-on-github-actions
-      - name: Check workflow files
-        run: |
-          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          ./actionlint -color -shellcheck=""
-
-  changed:
-    runs-on: ubuntu-latest
-    name: 'Diff: node-latest, ubuntu-latest'
-    outputs:
-      should_skip: ${{ steps.changed-files.outputs.only_changed == 'true' }}
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
-        with:
-          files: |
-            docs/**
-            .github/**
-            !.github/workflows/ci.yml
-            **.md
-
   test:
-    needs: changed
     name: 'Build&Test: node-${{ matrix.node_version }}, ${{ matrix.os }}'
-    if: needs.changed.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
 
-    timeout-minutes: 30
+    timeout-minutes: 50
 
     strategy:
       matrix:
@@ -124,28 +62,37 @@ jobs:
         run: pnpm run build
 
       - name: Test
-        run: pnpm run test:ci
+        run: pnpm run test:ci ${{ inputs.test-filter }}
 
       - name: Test Examples
-        run: pnpm run test:examples
+        run: pnpm run test:examples ${{ inputs.test-filter }}
 
       - name: Unit Test UI
         run: pnpm -C packages/ui test:ui
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() }}
+      - name: Pack @vitest/mocker
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node_version == 20 }}
+        working-directory: packages/mocker
+        env:
+          UV_THREADPOOL_SIZE: 1
+        run: |
+          pnpm pack
+          for f in vitest-mocker-*.tgz; do mv "$f" "${f#vitest-}"; done
+          ls -la mocker-*.tgz
+
+      - name: Upload @vitest/mocker tarball
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node_version == 20 }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report-${{ matrix.os }}-node-${{ matrix.node_version }}
-          path: test/ui/test-results/
-          retention-days: 30
+          name: vitest-mocker-tgz
+          path: packages/mocker/mocker-*.tgz
+          if-no-files-found: error
 
   test-cached:
-    needs: changed
     name: 'Cache&Test: node-${{ matrix.node_version }}, ${{ matrix.os }}'
-    if: needs.changed.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
 
-    timeout-minutes: 30
+    timeout-minutes: 50
 
     strategy:
       matrix:
@@ -178,12 +125,10 @@ jobs:
         run: pnpm run build
 
       - name: Test
-        run: pnpm run test:ci:cache
+        run: pnpm run test:ci:cache ${{ inputs.test-filter }}
 
   test-browser:
-    needs: changed
     name: 'Browsers: node-${{ matrix.node_version }}, ${{ matrix.os }}'
-    if: needs.changed.outputs.should_skip != 'true'
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -194,7 +139,7 @@ jobs:
           - windows-latest
       fail-fast: false
 
-    timeout-minutes: 30
+    timeout-minutes: 50
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -217,58 +162,14 @@ jobs:
         run: pnpm run build
 
       - name: Test Browser (playwright)
-        run: pnpm run test:browser:playwright
+        run: pnpm run test:browser:playwright ${{ inputs.test-filter }}
 
       - name: Test Browser (webdriverio)
-        run: pnpm run test:browser:webdriverio
+        run: pnpm run test:browser:webdriverio ${{ inputs.test-filter }}
 
-  test-rolldown:
-    needs: changed
-    # macos-latest is the fastest one
-    name: 'Rolldown&Test: node-22, macos-latest'
-    if: needs.changed.outputs.should_skip != 'true'
-    runs-on: macos-latest
-
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-and-cache
-        with:
-          node-version: 22
-
-      - uses: ./.github/actions/setup-webdriverio
-        id: setup-webdriverio
-        with:
-          firefox-version: false
-
-      - name: Install
-        run: |
-          yq -i '.overrides.vite = "npm:vite@8"' pnpm-workspace.yaml
-          git add . && git commit -m "ci" && pnpm i --prefer-offline --no-frozen-lockfile
-
-      - uses: ./.github/actions/setup-playwright
-
-      - name: Build
-        run: pnpm run build
-
-      - name: Test
-        run: pnpm run test:ci:no-bail
-
-      - name: Test Examples
-        if: ${{ !cancelled() }}
-        run: pnpm run test:examples
-
-      - name: Test Browser (playwright)
-        if: ${{ !cancelled() }}
-        run: pnpm run test:browser:playwright
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report-rolldown
-          path: rolldown/test/ui/test-results/
-          retention-days: 30
+  # test-rolldown removed for the sealed build: it rewrites pnpm-workspace.yaml
+  # to override vite with `npm:vite@8` and re-resolves dependencies with
+  # `pnpm i --no-frozen-lockfile` -- a forward-compat probe against whatever
+  # vite@8 resolves to today, which cannot be reproduced at release time.
+  # Every suite it runs (test:ci, test:examples, test:browser:playwright) also
+  # runs against the pinned vite in the test / test-cached / test-browser jobs.

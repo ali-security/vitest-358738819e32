@@ -14,8 +14,8 @@ describe('dom related activity', () => {
 
   test('viewport works correctly', async () => {
     await page.viewport(800, 600)
-    expect(window.innerWidth).toBe(800)
-    expect(window.innerHeight).toBe(600)
+    await expect.poll(() => window.innerWidth).toBe(800)
+    await expect.poll(() => window.innerHeight).toBe(600)
   })
 
   test('element doesn\'t exist', async () => {

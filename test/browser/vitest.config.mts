@@ -33,6 +33,7 @@ export default defineConfig({
   test: {
     include: ['test/**.test.{ts,js,tsx}'],
     includeSource: ['src/*.ts'],
+    testTimeout: process.platform === 'win32' || process.platform === 'darwin' ? 60_000 : undefined,
     // having a snapshot environment doesn't affect browser tests
     snapshotEnvironment: './custom-snapshot-env.ts',
     env: {

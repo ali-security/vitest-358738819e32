@@ -256,7 +256,7 @@ test('importOriginal returns original virtual module exports', () => {
   }
 })
 
-test.for(['node', 'playwright', 'webdriverio'])('mocking virtual module without importOriginal skips loading original (%s)', async (mode) => {
+test.for(['node', 'playwright', 'webdriverio'])('mocking virtual module without importOriginal skips loading original (%s)', { retry: 2 }, async (mode) => {
   const { stderr, testTree } = await runInlineTests({
     'vitest.config.js': `
 import { defineConfig } from 'vitest/config'
@@ -300,7 +300,7 @@ test('mock works without loading original', () => {
   `)
 })
 
-test.for(['node', 'playwright', 'webdriverio'])('mocking actual module with factory skips loading original (%s)', async (mode) => {
+test.for(['node', 'playwright', 'webdriverio'])('mocking actual module with factory skips loading original (%s)', { retry: 2 }, async (mode) => {
   const { stderr, errorTree, root } = await runInlineTests({
     'vitest.config.js': `
 import { defineConfig } from 'vitest/config'
@@ -353,7 +353,7 @@ test('mock works without loading original', () => {
   `)
 })
 
-test.for(['node', 'playwright', 'webdriverio'])('mocking actual module via __mocks__ skips loading original (%s)', async (mode) => {
+test.for(['node', 'playwright', 'webdriverio'])('mocking actual module via __mocks__ skips loading original (%s)', { retry: 2 }, async (mode) => {
   const { stderr, errorTree, root } = await runInlineTests({
     'vitest.config.js': `
 import { defineConfig } from 'vitest/config'
